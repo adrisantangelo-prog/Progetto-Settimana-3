@@ -1,0 +1,436 @@
+// ==========================================
+// 1. DATI E STATO DELL'APPLICAZIONE
+// ==========================================
+
+// Array di oggetti: ogni oggetto rappresenta una ricetta.
+// Usiamo "let" (e non "const") perché più avanti riassegneremo l'array
+// (ad esempio con filter() quando eliminiamo una ricetta).
+let ricette = [{
+    id: 1,                  // identificativo univoco, serve per trovare la ricetta
+    titolo: 'Carbonara',
+    chef: 'Max',
+    tempo: 20,              // minuti di preparazione
+    categoria: 'Primi',
+    preferito: true         // true = ricetta con la stella
+},
+{
+    id: 2,
+    titolo: 'Tiramisù',
+    chef: 'Alessandro',
+    tempo: 30,
+    categoria: 'Dolci',
+    preferito: true
+},
+{
+    id: 3,
+    titolo: 'Torta di Carote',
+    chef: 'Micheal',
+    tempo: 30,
+    categoria: 'Dolci',
+    preferito: false
+},
+{
+    id: 4,
+    titolo: 'Arrosto',
+    chef: 'Marietta',
+    tempo: 60,
+    categoria: 'Secondi',
+    preferito: false
+},
+];
+
+// Variabili di stato: descrivono "come" mostrare i dati in questo momento.
+// Quando cambiano, si richiama render() per aggiornare la pagina.
+let filtro = "tutti";       // tutti | preferiti
+let ordine = "titolo-asc";  // titolo-asc | titolo-desc | tempo-asc | tempo-desc
+let ricerca = "";           // testo scritto nella barra di ricerca
+let vista = "lista";        // lista | card | tabella
+let isDarkMode = false;     // traccia lo stato della modalità scura
+
+// Funzione per generare l'HTML di una ricetta nella vista lista.
+// Riceve un oggetto ricetta e restituisce una stringa HTML (template literal).
+function generaHTMLRicettaLista(ricetta) {
+    return `
+        <div>
+            <span class="recipe-text"><strong>${ricetta.titolo}</strong> di ${ricetta.chef} (${ricetta.tempo} min)</span>
+        </div>
+        <div class="actions-row">
+            <!-- Operatore ternario: stella piena se preferito, vuota altrimenti -->
+            <button class="btn-fav">${ricetta.preferito ? "★" : "☆"}</button>
+            <button class="btn-up">↑</button>
+            <button class="btn-down">↓</button>
+            <button class="btn-edit">Modifica</button>
+            <button class="btn-delete btn-danger">Elimina</button>
+        </div>
+    `;
+}
+
+// ==========================================
+// 2. FUNZIONI DI FEEDBACK UTENTE
+// ==========================================
+
+// Mostra un messaggio temporaneo (verde = successo, rosso = errore).
+// "tipo" ha un valore di default: se non lo passo, vale "successo".
+function mostraNotifica(testo, tipo = "successo") {
+    const notificaDiv = document.getElementById("notifica");
+    notificaDiv.innerText = testo;          // scrive il testo nel div
+    notificaDiv.style.display = "block";    // rende visibile il div
+
+    // Sceglie il colore di sfondo in base al tipo di notifica
+    if (tipo === "successo") {
+        notificaDiv.style.backgroundColor = "#16a34a"; // verde
+    } else {
+        notificaDiv.style.backgroundColor = "#dc2626"; // rosso
+    }
+
+    // Dopo 3 secondi (3000 ms) nasconde di nuovo la notifica
+    setTimeout(() => {
+        notificaDiv.style.display = "none";
+    }, 3000);
+}
+
+// ==========================================
+// 3. LA FUNZIONE CENTRALIZZATA RENDER
+// ==========================================
+// Ridisegna tutta l'interfaccia partendo dallo stato attuale.
+// Principio: lo stato (variabili + array) è la "verità", il DOM ne è il riflesso.
+function render() {
+    // --- GESTIONE TEMA (Sincronizzazione Stato -> DOM) ---
+    const btnTheme = document.getElementById("theme-toggle");
+    if (isDarkMode) {
+        document.body.classList.add("dark-mode");       // attiva la classe CSS scura
+        btnTheme.innerText = "☀️ Modalità Chiara";       // il bottone propone di tornare chiaro
+    } else {
+        document.body.classList.remove("dark-mode");
+        btnTheme.innerText = "🌙 Modalità Scura";
+    }
+
+    // Svuota il contenitore principale prima di ridisegnarlo
+    const container = document.getElementById("main-container");
+    container.innerHTML = "";
+
+    // --- AGGIORNAMENTO STATISTICHE ---
+    const totaleRicette = ricette.length;
+    // filter() tiene solo le ricette preferite, length le conta
+    const totalePreferite = ricette.filter(r => r.preferito).length;
+    // Percentuale di preferite sul totale (evita divisione per zero)
+    const percentuale = totaleRicette > 0 ? Math.round((totalePreferite / totaleRicette) * 100) : 0;
+
+    document.getElementById("stat-totale").innerText = totaleRicette;
+    document.getElementById("stat-preferite").innerText = totalePreferite;
+    // Imposta la larghezza della barra di progresso
+    document.getElementById("progress-bar-fill").style.width = `${percentuale}%`;
+
+    // --- FILTRAGGIO ---
+    // Crea un NUOVO array con le sole ricette che passano entrambi i controlli.
+    // Così l'array originale "ricette" non viene modificato.
+    let datiElaborati = ricette.filter(ricetta => {
+        // La ricerca controlla titolo O chef, ignorando maiuscole/minuscole
+        const matchRicerca = ricetta.titolo.toLowerCase().includes(ricerca.toLowerCase()) ||
+                             ricetta.chef.toLowerCase().includes(ricerca.toLowerCase());
+        // Se il filtro è "tutti" passano tutte, se è "preferiti" solo quelle con la stella
+        const matchStato = (filtro === "tutti") || (filtro === "preferiti" && ricetta.preferito);
+        return matchRicerca && matchStato; // deve valere entrambe
+    });
+
+    // --- ORDINAMENTO ---
+    // sort() ordina l'array sul posto; la funzione di confronto restituisce
+    // un numero negativo, zero o positivo.
+    datiElaborati.sort((a, b) => {
+        // localeCompare confronta le stringhe rispettando accenti e alfabeto
+        if (ordine === "titolo-asc") return a.titolo.localeCompare(b.titolo);
+        if (ordine === "titolo-desc") return b.titolo.localeCompare(a.titolo);
+        // Per i numeri basta la sottrazione
+        if (ordine === "tempo-asc") return a.tempo - b.tempo;
+        if (ordine === "tempo-desc") return b.tempo - a.tempo;
+        return 0; // nessun ordinamento riconosciuto: lascia l'ordine com'è
+    });
+
+    // Se dopo filtri e ricerca non resta nulla, mostra un messaggio ed esce
+    if (datiElaborati.length === 0) {
+        container.innerHTML = "<p>Nessuna ricetta trovata.</p>";
+        return;
+    }
+
+    // --- RENDER DELLE VISTE ---
+    if (vista === "lista") {
+        // reduce() raggruppa le ricette per categoria, producendo un oggetto così:
+        // { Primi: [...], Dolci: [...], Secondi: [...] }
+        const raggruppato = datiElaborati.reduce((acc, current) => {
+            // Se la categoria non esiste ancora nell'accumulatore, crea un array vuoto
+            if (!acc[current.categoria]) acc[current.categoria] = [];
+            acc[current.categoria].push(current);
+            return acc; // l'accumulatore va sempre restituito
+        }, {}); // {} è il valore iniziale dell'accumulatore
+
+        // Cicla su ogni categoria dell'oggetto
+        for (const cat in raggruppato) {
+            // Titolo della sezione, es. "Dolci (2)"
+            const h3 = document.createElement("h3");
+            h3.innerText = `${cat} (${raggruppato[cat].length})`;
+            container.appendChild(h3);
+
+            // Lista non ordinata senza puntini e senza padding
+            const ul = document.createElement("ul");
+            ul.style.listStyle = "none";
+            ul.style.padding = "0";
+
+            // Un <li> per ogni ricetta della categoria
+            raggruppato[cat].forEach(ricetta => {
+                const li = document.createElement("li");
+                li.className = "recipe-item";
+                li.dataset.id = ricetta.id; // salva l'id in data-id: servirà per i click
+                li.innerHTML = generaHTMLRicettaLista(ricetta);
+                ul.appendChild(li);
+            });
+            container.appendChild(ul);
+        }
+
+    } else if (vista === "card") {
+        // Contenitore a griglia (lo stile è nel CSS con .card-grid)
+        const grid = document.createElement("div");
+        grid.className = "card-grid";
+
+        datiElaborati.forEach(ricetta => {
+            const card = document.createElement("div");
+            card.className = "recipe-card";
+            card.dataset.id = ricetta.id; // data-id per riconoscere la ricetta al click
+            card.innerHTML = `
+                <!-- Lo span .recipe-text permette alla modifica inline di trovare il titolo -->
+                <h4><span class="recipe-text">${ricetta.titolo}</span></h4>
+                <p>Chef: ${ricetta.chef}</p>
+                <p>Tempo: ${ricetta.tempo} min</p>
+                <p>Categoria: <strong>${ricetta.categoria}</strong></p>
+                <div class="actions-row">
+                    <button class="btn-fav">${ricetta.preferito ? "★" : "☆"}</button>
+                    <button class="btn-edit">Modifica</button>
+                    <button class="btn-delete btn-danger">Elimina</button>
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+        container.appendChild(grid);
+
+    } else if (vista === "tabella") {
+        const table = document.createElement("table");
+        // Intestazione della tabella e corpo vuoto da riempire
+        table.innerHTML = `
+            <thead>
+                <tr>
+                    <th>Titolo</th>
+                    <th>Chef</th>
+                    <th>Tempo</th>
+                    <th>Categoria</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        `;
+        const tbody = table.querySelector("tbody");
+
+        // Una riga <tr> per ogni ricetta
+        datiElaborati.forEach(ricetta => {
+            const tr = document.createElement("tr");
+            tr.dataset.id = ricetta.id; // data-id sulla riga
+            tr.innerHTML = `
+                <!-- Lo span .recipe-text permette alla modifica inline di trovare il titolo -->
+                <td><span class="recipe-text">${ricetta.titolo}</span></td>
+                <td>${ricetta.chef}</td>
+                <td>${ricetta.tempo} min</td>
+                <td>${ricetta.categoria}</td>
+                <td>
+                    <div class="actions-row">
+                        <button class="btn-fav">${ricetta.preferito ? "★" : "☆"}</button>
+                        <button class="btn-edit">Modifica</button>
+                        <button class="btn-delete btn-danger">Elimina</button>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+        container.appendChild(table);
+    }
+}
+
+
+// ==========================================
+// 4. AGGIUNTA NUOVO ELEMENTO
+// ==========================================
+// Ascolta l'invio del form per aggiungere una ricetta
+document.getElementById("recipe-form").addEventListener("submit", function(e) {
+    e.preventDefault(); // impedisce il ricaricamento della pagina
+
+    // Legge i valori dei campi; trim() toglie gli spazi all'inizio e alla fine
+    const titoloVal = document.getElementById("titolo").value.trim();
+    const chefVal = document.getElementById("chef").value.trim();
+    const tempoVal = document.getElementById("tempo").value.trim();
+    const categoriaVal = document.getElementById("categoria").value;
+    const erroreP = document.getElementById("errore");
+
+    // Validazione: se anche un solo campo è vuoto, mostra l'errore e si ferma
+    if (!titoloVal || !chefVal || !tempoVal || !categoriaVal) {
+        erroreP.innerText = "Tutti i campi contrassegnati con * sono obbligatori!";
+        return;
+    }
+
+    erroreP.innerText = ""; // tutto ok: cancella eventuali errori precedenti
+
+    // Costruisce il nuovo oggetto ricetta
+    const nuovaRicetta = {
+        id: Date.now(),                 // timestamp in millisecondi: id praticamente univoco
+        titolo: titoloVal,
+        chef: chefVal,
+        tempo: parseInt(tempoVal),      // converte la stringa in numero intero
+        categoria: categoriaVal,
+        preferito: false                // una nuova ricetta parte senza stella
+    };
+
+    ricette.push(nuovaRicetta);         // la aggiunge in fondo all'array
+    this.reset();                       // svuota il form ("this" è il form stesso)
+    mostraNotifica("Ricetta aggiunta con successo!");
+    render();                           // aggiorna la pagina
+});
+
+
+// ==========================================
+// 5. EVENT DELEGATION SUL CONTENITORE
+// ==========================================
+// Invece di mettere un listener su ogni bottone (che verrebbero distrutti ad
+// ogni render), ne mettiamo UNO solo sul contenitore. Ogni click "risale"
+// (bubbling) fino a lui e qui capiamo quale bottone è stato premuto.
+document.getElementById("main-container").addEventListener("click", function(e) {
+    // Trova l'elemento antenato più vicino che ha un data-id (riga, card o li)
+    const targetRow = e.target.closest("[data-id]");
+    if (!targetRow) return; // click fuori da una ricetta: non fare nulla
+    const idSelezionato = parseInt(targetRow.dataset.id); // data-id è una stringa: la convertiamo
+
+    // --- ELIMINA ---
+    if (e.target.classList.contains("btn-delete")) {
+        // Ricrea l'array tenendo tutte le ricette tranne quella selezionata
+        ricette = ricette.filter(r => r.id !== idSelezionato);
+        mostraNotifica("Ricetta rimossa.", "errore");
+        render();
+    }
+
+    // --- PREFERITO ---
+    if (e.target.classList.contains("btn-fav")) {
+        const ricetta = ricette.find(r => r.id === idSelezionato);
+        if (ricetta) {
+            ricetta.preferito = !ricetta.preferito; // inverte true/false
+            render();
+        }
+    }
+
+    // --- SPOSTA SU ---
+    if (e.target.classList.contains("btn-up")) {
+        const index = ricette.findIndex(r => r.id === idSelezionato);
+        if (index > 0) { // se è già la prima non si può salire
+            // Scambio di due elementi con la destrutturazione
+            [ricette[index], ricette[index - 1]] = [ricette[index - 1], ricette[index]];
+            render();
+        }
+    }
+
+    // --- SPOSTA GIÙ ---
+    if (e.target.classList.contains("btn-down")) {
+        const index = ricette.findIndex(r => r.id === idSelezionato);
+        // Deve esistere (!== -1) e non essere l'ultima
+        if (index !== -1 && index < ricette.length - 1) {
+            [ricette[index], ricette[index + 1]] = [ricette[index + 1], ricette[index]];
+            render();
+        }
+    }
+
+    // --- MODIFICA TITOLO (inline) ---
+    if (e.target.classList.contains("btn-edit")) {
+        // Cerca lo span col testo: ora esiste in tutte e tre le viste (lista, card, tabella)
+        const textSpan = targetRow.querySelector(".recipe-text");
+        if (!textSpan) return;
+
+        const ricetta = ricette.find(r => r.id === idSelezionato);
+
+        // Crea un campo di testo precompilato col titolo attuale
+        const input = document.createElement("input");
+        input.type = "text";
+        input.className = "inline-edit-input";
+        input.value = ricetta.titolo;
+
+        textSpan.replaceWith(input); // sostituisce il testo con l'input
+        input.focus();               // il cursore parte già dentro il campo
+
+        // Flag anti doppio salvataggio: premendo Invio, render() rimuove l'input
+        // e questo può far scattare anche "blur", richiamando salvaModifica una seconda volta.
+        let giaSalvato = false;
+
+        // Salva il nuovo titolo (se non è vuoto) e ridisegna la pagina
+        function salvaModifica() {
+            if (giaSalvato) return; // già salvato: ignora le chiamate successive
+            giaSalvato = true;
+
+            const nuovoTitolo = input.value.trim();
+            if (nuovoTitolo) {
+                ricetta.titolo = nuovoTitolo;
+                mostraNotifica("Titolo aggiornato.");
+            }
+            render();
+        }
+
+        // Si salva premendo Invio...
+        input.addEventListener("keydown", (evt) => {
+            if (evt.key === "Enter") salvaModifica();
+        });
+        // ...oppure cliccando fuori dal campo (perdita del focus)
+        input.addEventListener("blur", salvaModifica);
+    }
+});
+
+
+// ==========================================
+// 6. GESTIONE CAMBIO TEMA (NUOVO)
+// ==========================================
+document.getElementById("theme-toggle").addEventListener("click", function() {
+    isDarkMode = !isDarkMode; // inverte lo stato logico del tema
+    render();                 // riapplica i cambiamenti grafici
+});
+
+
+// ==========================================
+// 7. EVENTI LIVE DI FILTRO E RICERCA
+// ==========================================
+// "input" scatta a ogni carattere digitato: la ricerca è in tempo reale
+document.getElementById("search-input").addEventListener("input", function(e) {
+    ricerca = e.target.value; // aggiorna lo stato
+    render();                 // ridisegna con il nuovo filtro
+});
+
+// "change" scatta quando si sceglie una voce diversa nella select
+document.getElementById("filter-select").addEventListener("change", function(e) {
+    filtro = e.target.value;  // "tutti" oppure "preferiti"
+    render();
+});
+
+document.getElementById("sort-select").addEventListener("change", function(e) {
+    ordine = e.target.value;  // es. "titolo-asc", "tempo-desc"...
+    render();
+});
+
+
+// ==========================================
+// 8. GESTIONE CAMBIO VISTA MULTI-VISTA
+// ==========================================
+// Seleziona tutti i bottoni di vista e assegna a ciascuno un listener
+document.querySelectorAll(".btn-view").forEach(bottone => {
+    bottone.addEventListener("click", function() {
+        // Toglie la classe "active" a tutti i bottoni...
+        document.querySelectorAll(".btn-view").forEach(b => b.classList.remove("active"));
+        // ...e la mette solo su quello cliccato
+        this.classList.add("active");
+        vista = this.dataset.view; // legge data-view (lista | card | tabella)
+        render();
+    });
+});
+
+
+// AVVIO INIZIALE
+// Primo disegno della pagina all'apertura
+render();
