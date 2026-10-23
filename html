@@ -1,12 +1,106 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylecss" href="asset/css">
     <title>Ricettario</title>
 </head>
+
 <body>
+    <!-- Notifiche Temporanee -->
+    <div id="notifica"></div>
+    <header>
+        <h1>ChefBook</h1>
+        <p>Gestisci le tue ricette preferite </p>
+    </header>
+    <main class="container">
+
+        <!-- Sezione Statistiche-->
+        <section class="box stats-section">
+            <h2>Statistiche</h2>
+            <div class="stats-grid">
+                <div class="stats-card">
+                    <span class="stat-num" id="stat-totale">0</span>
+                    <span class="stat-label">Ricette Totali</span>
+                </div>
+                <div class="stats-grid">
+                    <div class="stats-card">
+                        <span class="stat-num" id="stat-preferite">0</span>
+                        <span class="stat-label">Preferite (★)</span>
+                    </div>
+                </div>
+                <div class="progress-container">
+                    <label>Percentuale Preferite:</label>
+                    <div class="progress-bar-bg">
+                        <div id="progress-bar-fill" class="progress-bar-fill"></div>
+                    </div>
+                </div>
+        </section>
+
+        <!-- Sezione form di inserimento -->
+         <section class="box form-section">
+            <h2>Aggiungi una nuova ricetta</h2>
+            <form id="recipe-group">
+                <div class="form-group">
+                    <label for="titolo">Nome Ricetta *</label>
+                    <input type="text" id="titolo" placeholder="Es. Carbonara">
+                </div>
+                <div class="form-group">
+                    <label for="chef">Chef / Autore *</label>
+                    <input type="text" id="chef" placeholder="Es. Nonna Rosa">
+                </div>
+                <div class="form-group">
+                    <label for="tempo">Tempo di Preparazione (minuti) *</label>
+                    <input type="number" id="tempo" min="1" placeholder="Es. 25">
+                </div>
+               <div class="form-group">
+                <label for="categoria">Categoria *</label>
+                <select id="categoria">
+                    <option value=" ">--Seleziona--</option>
+                    <option value="Primi">Primi</option>
+                    <option value="Secondi">Secondi</option>
+                    <option value="Dolci">Dolci</option>
+                </select>
+               </div>
+               <p id="errore" class="error-text"></p>
+               <button type="submit" class="btn btn-success">Salva Ricetta</button>
+            </form>
+         </section>
+
+         <!-- Sezione filtri e ricetta -->
+          <section class="box controls-section">
+            <div class="search-filter-row">
+                <input type="search" id="search-input" placeholder="Cerca per titolo o chef...">
+
+                <select id="filter-select">
+                   <option value="tutti">Mostra: Tutti</option>
+                   <option value="preferiti">Mostra: Solo Preferiti ★</option>
+                </select>
+
+                <select id="sort-select">
+                   <option value="titolo-asc">Ordina per: Titolo (A-Z)</option>
+                   <option value="titolo-desc">Ordina per: Titolo (Z-A)</option>
+                   <option value="tempo-asc">Ordina per: Tempo (Crescente)</option>
+                   <option value="tempo-desc">Ordina per: Tempo (Decrescente)</option>
+                </select>
+            </div>
+
+            <!-- Cambio vista -->
+             <div class="view-buttons">
+                <button class="btn btn-view active" data-view="lista">Visualizzazione Lista</button>
+                <button class="btn btn-view" data-view="card">Visualizzazione Card</button>
+                <button class="btn btn-view" data-view="tabella">Visualizzazione Tabella</button>
+             </div>
+        </section>
+
+        <!-- Contenitore principale dati -->
+         <section class="box display-section">
+            <div id="main-container"></div>
+         </section>
+
+    </main>
     <script src="asset/js"></script>
 </body>
 </html>
